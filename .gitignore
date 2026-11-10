@@ -1,0 +1,27 @@
+# Secrets et configuration locale
+.env
+.env.*
+*.pem
+*.key
+secrets/
+
+# Systeme
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editeurs / IDE
+.vscode/
+.idea/
+*.swp
+
+# Journaux et fichiers temporaires
+*.log
+*.tmp
+tmp/
+temp/
+
+# Archives et sorties generees
+dist/
+build/
+out/

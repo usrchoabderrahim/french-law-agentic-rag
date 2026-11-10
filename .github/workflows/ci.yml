@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ production ]
+  push:
+    branches: [ production ]
+
+jobs:
+  repo-checks:
+    name: Verification des fichiers du depot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fichiers obligatoires
+        run: |
+          for f in README.md CONTRIBUTING.md .gitignore .github/CODEOWNERS; do
+            test -f "$f" || { echo "Fichier manquant : $f"; exit 1; }
+          done
+
+      - name: Aucun fichier .env versionne
+        run: |
+          if git ls-files | grep -E '(^|/)\.env($|\.)'; then
+            echo "Un fichier .env est versionne"; exit 1
+          fi
