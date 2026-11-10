@@ -228,7 +228,7 @@ Le dépôt applique une stratégie de branches protégée :
 | Branche | Rôle |
 |---|---|
 | `production` | Branche principale, protégée |
-| `<Prénom/Nom>` | Branche personnelle de chaque contributeur |
+| `<Nom>` | Branche personnelle de chaque contributeur |
 
 Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour le processus détaillé.
 
