@@ -13,7 +13,7 @@ Merci de contribuer à **Agentic RAG — Legal Assistant (composant francophone)
 | Branche | Règle |
 |---|---|
 | `production` | Protégée. Modifications via Pull Request |
-| `<Prénom/Nom>` | Branche personnelle de chaque contributeur |
+| `<Nom>` | Branche personnelle de chaque contributeur |
 
 ## Processus
 
