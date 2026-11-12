@@ -1,0 +1,40 @@
+project:
+  name: ma-regulatory-assistant
+  country: MA
+  corpus_languages: ["fr"]
+  target_languages_later: ["ar"]
+
+collection:
+  recent_years: 10
+  request_timeout_seconds: 30
+  request_delay_seconds: 2.0
+  max_pdf_size_mb: 100
+  user_agent: "MA-Regulatory-Assistant-Research/0.1"
+  data_dir: "data"
+
+sources:
+  sgg:
+    name: "Secrétariat Général du Gouvernement — Bulletin officiel"
+    catalogue_url: "https://www.sgg.gov.ma/Bulletinofficiel.aspx"
+    allowed_hosts: ["www.sgg.gov.ma", "sgg.gov.ma"]
+    enabled: true
+
+ingestion:
+  supported_extensions: [".pdf", ".docx", ".txt", ".md", ".markdown", ".html", ".htm"]
+  chunking:
+    strategy: "section"
+    chunk_size: 1200
+    chunk_overlap: 180
+    semantic_similarity_threshold: 0.72
+
+embeddings:
+  provider: "sentence-transformers"
+  model_name: "BAAI/bge-m3"
+  device: "auto"
+
+retrieval:
+  qdrant:
+    url: "http://localhost:6333"
+    collection: "ma_legal_chunks"
+  bm25:
+    index_path: "data/indexes/bm25_index.pkl"

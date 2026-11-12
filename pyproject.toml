@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ma-regulatory-assistant"
+version = "0.1.0"
+description = "Local ingestion foundation for a Moroccan regulatory agentic RAG assistant"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2.7,<3",
+  "PyYAML>=6.0",
+  "requests>=2.31",
+  "beautifulsoup4>=4.12",
+  "pymupdf>=1.24",
+  "python-docx>=1.1",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "psycopg[binary]>=3.1"
+]
+
+[project.optional-dependencies]
+retrieval = [
+  "sentence-transformers>=3.0",
+  "qdrant-client>=1.9",
+  "rank-bm25>=0.2.2",
+  "numpy>=1.26"
+]
+ocr = ["pytesseract>=0.3.10", "Pillow>=10"]
+dev = [
+  "pytest>=8",
+  "pytest-cov>=5",
+  "ruff>=0.5",
+  "black>=24",
+  "mypy>=1.10",
+  "pre-commit>=3.7"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
