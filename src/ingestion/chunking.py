@@ -14,7 +14,10 @@ from ingestion.schemas import DocumentChunk, LoadedDocument
 
 ARTICLE_LINE_RE = re.compile(
     r"^\s*(?:ARTICLE|ART\.?|ARL\.?|ANT\.?|AUR\.?)\s+"
-    r"(?P<number>PREMIER|PREMIÈRE|UNIQUE|1ER|\d{1,3}(?:[A-Z])?(?:[°º])?"
+    r"(?P<number>PREMIER|PREMIÈRE|UNIQUE|1ER|\d{1,3}(?:"
+    r"(?:\.\d{1,3})+(?!\d)"
+    r"|(?:\s*\.\s*|,)\d{1,3}(?=\s*(?:[:—–-]|$))"
+    r"|[A-Z]?[°º]?)"
     r"(?:\s+(?:BIS|TER|QUATER))?)"
     r"\s*(?:[.:,;]\s*)?(?:[—–-]\s*)?(?P<rest>.*)$",
     re.IGNORECASE,
@@ -61,6 +64,10 @@ STRUCTURE_HEADING_RE = re.compile(
     r"\s+(?:PARTIE|SECTION|CHAPITRE|TITRE|LIVRE)"
     r")[^\n]*)$",
     re.IGNORECASE,
+)
+
+ROMAN_SECTION_HEADING_RE = re.compile(
+    r"^\s*(?P<heading>[IVX]{1,6}\.[ \t]+[A-ZÀ-ÖØ-Þ][^\n]{2,100})\s*$"
 )
 
 DOCUMENT_SECTION_RE = re.compile(
@@ -178,6 +185,7 @@ def _normalize_article_number(value: str) -> str:
         return number
 
     number = re.sub(r"[°º]$", "", number)
+    number = re.sub(r"\s*[.,]\s*", ".", number)
     number = re.sub(r"\s+(BIS|TER|QUATER)$", r" \1", number)
     return number
 
@@ -396,7 +404,7 @@ def _is_caps_heading(line: str) -> bool:
     if not cleaned or PROCEDURAL_HEADING_RE.match(cleaned):
         return False
 
-    if DOCUMENT_SECTION_RE.match(cleaned):
+    if cleaned[0].isupper() and DOCUMENT_SECTION_RE.match(cleaned):
         return True
 
     # Retain only clearly labelled all-caps section headings. A broad
@@ -463,7 +471,9 @@ def _classify_page_text(page_text: str) -> str:
     if article_count > 0 or legal_marker_hits >= 2:
         return "LEGAL_CONTENT"
 
-    has_toc_label = bool(TOC_LABEL_RE.search(folded))
+    has_toc_label = bool(TOC_LABEL_RE.search(folded)) or (
+        leader_count > 0 and any(_fold_text(line) == "table des matieres" for line in lines)
+    )
 
     dense_toc_listing = (
         article_count == 0 and act_count >= 3 and (leader_count >= 1 or printed_page_count >= 1)
@@ -604,23 +614,24 @@ def _collect_heading_events(
             offset += len(line) + 1
             continue
 
+        roman_structure_match = ROMAN_SECTION_HEADING_RE.match(line)
         if in_signature_block:
             # The signature block continues until a new act/article or a
             # clearly identified administrative section is encountered.
-            if _is_caps_heading(line):
+            if roman_structure_match or _is_caps_heading(line):
                 in_signature_block = False
             else:
                 offset += len(line) + 1
                 continue
 
-        structure_match = STRUCTURE_HEADING_RE.match(line)
+        structure_match = STRUCTURE_HEADING_RE.match(line) or roman_structure_match
         if structure_match:
             heading = structure_match.group("heading").strip()
             kind_match = re.match(
                 r"(?i)^(SOUS[- ]SECTION|CHAPITRE|TITRE|SECTION|LIVRE|PARTIE)",
                 heading,
             )
-            if kind_match is None:
+            if kind_match is None and not roman_structure_match:
                 kind_match = re.search(
                     r"(?i)\b(PARTIE|SECTION|CHAPITRE|TITRE|LIVRE)$",
                     heading,
@@ -693,7 +704,7 @@ def _extract_heading_metadata(
     if act_match and _has_act_title_qualifier(heading):
         return "ACT", None
 
-    structure_match = STRUCTURE_HEADING_RE.match(heading)
+    structure_match = STRUCTURE_HEADING_RE.match(heading) or ROMAN_SECTION_HEADING_RE.match(heading)
     if structure_match:
         return "SECTION", None
 

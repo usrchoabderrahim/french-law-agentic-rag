@@ -21,7 +21,9 @@ def stable_chunk_id(document_id: str, chunk_index: int, text: str) -> str:
     return hashlib.sha256(payload).hexdigest()[:32]
 
 
-def export_chunks(processed_dir: Path, output_file: Path) -> dict[str, Any]:
+def export_chunks(
+    processed_dir: Path, output_file: Path, *, include_local_paths: bool = True
+) -> dict[str, Any]:
     if not processed_dir.exists():
         raise FileNotFoundError(f"Dossier processed introuvable : {processed_dir}")
 
@@ -46,7 +48,9 @@ def export_chunks(processed_dir: Path, output_file: Path) -> dict[str, Any]:
                 errors.append({"file": str(processed_file), "error": str(exc)})
                 continue
 
-            document_metadata = saved.get("metadata") or {}
+            document_metadata = dict(saved.get("metadata") or {})
+            if not include_local_paths:
+                document_metadata.pop("local_path", None)
             document_id = str(document_metadata.get("document_id") or processed_file.stem)
             chunks = saved.get("chunks") or []
 
@@ -73,7 +77,7 @@ def export_chunks(processed_dir: Path, output_file: Path) -> dict[str, Any]:
                     )
                 seen_ids.add(chunk_id)
 
-                # Preserve the complete original chunk payload and document metadata.
+                # Preserve the chunk payload and its document metadata.
                 row = {
                     "chunk_id": chunk_id,
                     "document_id": document_id,
@@ -95,7 +99,6 @@ def export_chunks(processed_dir: Path, output_file: Path) -> dict[str, Any]:
         "embedding_model": "BAAI/bge-m3",
         "expected_embedding_dimension": 1024,
         "language_scope": ["fr"],
-        "processed_directory": str(processed_dir.resolve()),
         "processed_files_found": len(processed_files),
         "documents_with_chunks": documents_with_chunks,
         "chunks_exported": exported_chunks,
@@ -105,6 +108,8 @@ def export_chunks(processed_dir: Path, output_file: Path) -> dict[str, Any]:
         "created_at_utc": datetime.now(UTC).isoformat(),
         "errors": errors,
     }
+    if include_local_paths:
+        manifest["processed_directory"] = str(processed_dir.resolve())
 
     manifest_path = output_file.with_name("chunk_export_manifest.json")
     manifest_path.write_text(

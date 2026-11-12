@@ -112,11 +112,49 @@ def test_import_html_extracts_publication_date(tmp_path):
     assert result.metadata.source_url == "https://www.sgg.gov.ma/"
 
 
+def test_import_html_prefers_main_content(tmp_path):
+    path = tmp_path / "inscription.html"
+    path.write_text(
+        """
+        <html>
+        <head>
+            <title>Guide E-Scolarité</title>
+            <meta name="date" content="2024-03-12">
+        </head>
+        <body>
+            <header>Nom du site</header>
+            <main>
+                <div id="wrap">
+                    <h1>Inscription</h1>
+                    <p>Créez votre compte.</p>
+                    <nav>Navigation du guide</nav>
+                </div>
+            </main>
+            <footer>Adresse du site</footer>
+        </body>
+        </html>
+        """,
+        encoding="utf-8",
+    )
+
+    result = load_document(path)
+
+    assert result.pages[0].text == "Inscription\nCréez votre compte."
+    assert result.metadata.title == "Guide E-Scolarité"
+    assert result.metadata.publication_date == date(2024, 3, 12)
+
+
+def _insert_scan_image(page, rect=None):
+    image = pymupdf.Pixmap(pymupdf.csGRAY, pymupdf.IRect(0, 0, 64, 64), False)
+    image.clear_with(200)
+    page.insert_image(rect or page.rect, pixmap=image, keep_proportion=False)
+
+
 def test_import_scanned_pdf_uses_ocr(tmp_path, monkeypatch):
     path = tmp_path / "scan.pdf"
 
     pdf = pymupdf.open()
-    pdf.new_page()
+    _insert_scan_image(pdf.new_page())
     pdf.save(path)
     pdf.close()
 
@@ -134,6 +172,72 @@ def test_import_scanned_pdf_uses_ocr(tmp_path, monkeypatch):
     assert result.metadata.extra["ocr"]["pages_with_text_count"] == 1
 
     assert result.metadata.extra["ocr"]["pages_with_text"] == [1]
+
+
+def test_import_mixed_pdf_routes_pages_and_preserves_native_fallback(tmp_path, monkeypatch):
+    path = tmp_path / "mixed.pdf"
+    native_text = "Guide court."
+    hidden_header = "FST Béni Mellal. " * 10
+    body_text = "Le texte natif du guide reste disponible. " * 3
+
+    with pymupdf.open() as pdf:
+        short_native = pdf.new_page()
+        short_native.insert_text((30, 45), native_text)
+        _insert_scan_image(short_native, pymupdf.Rect(10, 10, 20, 20))
+
+        incomplete_layer = pdf.new_page()
+        _insert_scan_image(incomplete_layer)
+        incomplete_layer.insert_textbox(pymupdf.Rect(30, 20, 560, 70), hidden_header, render_mode=3)
+
+        complete_layer = pdf.new_page()
+        _insert_scan_image(complete_layer)
+        complete_layer.insert_textbox(pymupdf.Rect(30, 300, 560, 400), body_text)
+
+        pdf.new_page()
+
+        failed = pdf.new_page()
+        _insert_scan_image(failed)
+        failed.insert_text((30, 45), native_text)
+
+        _insert_scan_image(pdf.new_page())
+
+        final_native = pdf.new_page()
+        final_native.insert_text((30, 45), "Dernière page.")
+        pdf.save(path)
+
+    attempted = []
+
+    def recognize(page):
+        attempted.append(page.number + 1)
+        if page.number == 4:
+            raise RuntimeError("Tesseract process timeout")
+        return "" if page.number == 5 else "Texte complet du document scanné."
+
+    monkeypatch.setattr("ingestion.loaders._ocr_pdf_page", recognize)
+
+    result = load_document(path)
+
+    assert attempted == [2, 5, 6]
+    assert [page.page_number for page in result.pages] == list(range(1, 8))
+    assert result.pages[0].text.strip() == native_text
+    assert result.pages[1].text == "Texte complet du document scanné."
+    assert "Le texte natif du guide" in result.pages[2].text
+    assert not result.pages[3].text.strip()
+    assert result.pages[4].text.strip() == native_text
+    assert not result.pages[5].text.strip()
+    assert result.pages[6].text.strip() == "Dernière page."
+
+    ocr = result.metadata.extra["ocr"]
+    assert ocr["pages_attempted"] == [2, 5, 6]
+    assert ocr["pages_with_text"] == [2]
+    assert ocr["pages_failed"] == [5, 6]
+    assert ocr["pages_failed_count"] == 2
+    diagnostics = ocr["page_diagnostics"]
+    expected_sources = ["native", "ocr", "native", "blank", "failed", "failed", "native"]
+    assert [page["source"] for page in diagnostics] == expected_sources
+    assert diagnostics[1]["reason"] == "incomplete_native_text_layer"
+    assert diagnostics[1]["duration_seconds"] >= 0
+    assert diagnostics[4]["error"] == "Tesseract process timeout"
 
 
 def test_import_ocr_txt_preserves_page_markers(tmp_path):

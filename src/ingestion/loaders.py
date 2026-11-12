@@ -5,6 +5,7 @@ import re
 import shutil
 from datetime import date, datetime
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import pymupdf
@@ -32,6 +33,8 @@ OCR_TIMEOUT_SECONDS = 120
 # Seuils de détection des pages nécessitant un OCR
 MIN_EXTRACTED_TEXT_LENGTH = 100
 MIN_ALPHANUMERIC_CHARACTERS = 50
+SCAN_IMAGE_COVERAGE = 0.15
+DOMINANT_IMAGE_COVERAGE = 0.50
 
 
 def _configure_tesseract() -> None:
@@ -74,6 +77,41 @@ def _needs_ocr(text: str) -> bool:
     return len(normalized) < MIN_EXTRACTED_TEXT_LENGTH or alphanumeric < MIN_ALPHANUMERIC_CHARACTERS
 
 
+def _pdf_ocr_reason(page: pymupdf.Page, text: str) -> str | None:
+    """Route image-heavy pages whose native text does not cover the scanned body."""
+    bounds = page.rect * page.derotation_matrix
+    largest_image = max(
+        (pymupdf.Rect(image["bbox"]) & bounds for image in page.get_image_info()),
+        key=pymupdf.Rect.get_area,
+        default=pymupdf.Rect(),
+    )
+    if largest_image.is_empty:
+        if not text.strip() and page.get_drawings():
+            return "vector_content_without_text"
+        return None
+
+    if not text.strip():
+        return "image_without_text"
+    image_coverage = largest_image.get_area() / bounds.get_area()
+    if image_coverage >= SCAN_IMAGE_COVERAGE and _needs_ocr(text):
+        return "insufficient_native_text"
+    if image_coverage < DOMINANT_IMAGE_COVERAGE:
+        return None
+
+    # A searchable heading or footer can pass the overall text-length check.
+    margin = largest_image.height * 0.2
+    body = pymupdf.Rect(
+        largest_image.x0,
+        largest_image.y0 + margin,
+        largest_image.x1,
+        largest_image.y1 - margin,
+    )
+    body_text = page.get_textbox(body)
+    if _needs_ocr(body_text) or body_text.count("\ufffd") * 10 > len(body_text):
+        return "incomplete_native_text_layer"
+    return None
+
+
 def _ocr_pdf_page(page) -> str:
     """Extract French text from a scanned PDF page."""
     import pytesseract
@@ -84,10 +122,11 @@ def _ocr_pdf_page(page) -> str:
     pixmap = page.get_pixmap(
         dpi=OCR_DPI,
         alpha=False,
+        colorspace=pymupdf.csGRAY,
     )
 
     with Image.frombytes(
-        "RGB",
+        "L",
         (pixmap.width, pixmap.height),
         pixmap.samples,
     ) as image:
@@ -195,6 +234,8 @@ def load_document(
         pages = []
         ocr_attempted_pages = []
         ocr_successful_pages = []
+        ocr_failed_pages = []
+        page_diagnostics = []
 
         with pymupdf.open(file_path) as pdf:
             extra = dict(pdf.metadata or {})
@@ -202,17 +243,31 @@ def load_document(
             for index, page in enumerate(pdf, start=1):
                 extracted_text = page.get_text("text") or ""
                 final_text = extracted_text
-
-                # Détection des pages scannées
-                if ocr_enabled and _needs_ocr(extracted_text):
+                has_native_text = bool(extracted_text.strip())
+                diagnostic: dict[str, Any] = {
+                    "page_number": index,
+                    "source": "native" if has_native_text else "blank",
+                    "reason": "native_text" if has_native_text else "no_visible_content",
+                }
+                ocr_reason = _pdf_ocr_reason(page, extracted_text) if ocr_enabled else None
+                if not ocr_enabled:
+                    diagnostic["reason"] = "ocr_disabled"
+                elif ocr_reason is not None:
                     ocr_attempted_pages.append(index)
-
-                    # Reconnaissance OCR française
-                    ocr_text = _ocr_pdf_page(page)
-
-                    if ocr_text.strip():
+                    diagnostic["reason"] = ocr_reason
+                    started = perf_counter()
+                    try:
+                        ocr_text = _ocr_pdf_page(page).strip()
+                        if not ocr_text:
+                            raise ValueError("OCR sans texte exploitable.")
+                    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+                        diagnostic.update(source="failed", error=str(exc))
+                        ocr_failed_pages.append(index)
+                    else:
                         final_text = ocr_text
+                        diagnostic["source"] = "ocr"
                         ocr_successful_pages.append(index)
+                    diagnostic["duration_seconds"] = round(perf_counter() - started, 3)
 
                 pages.append(
                     PageText(
@@ -220,6 +275,7 @@ def load_document(
                         text=final_text,
                     )
                 )
+                page_diagnostics.append(diagnostic)
 
         # Métadonnées OCR
         extra["ocr"] = {
@@ -230,6 +286,9 @@ def load_document(
             "pages_with_text": ocr_successful_pages,
             "pages_attempted_count": len(ocr_attempted_pages),
             "pages_with_text_count": len(ocr_successful_pages),
+            "pages_failed": ocr_failed_pages,
+            "pages_failed_count": len(ocr_failed_pages),
+            "page_diagnostics": page_diagnostics,
         }
 
         title = extra.get("title") or file_path.stem
@@ -349,7 +408,8 @@ def load_document(
 
         title = soup.title.get_text(" ", strip=True) if soup.title else file_path.stem
 
-        text = soup.get_text(
+        content = soup.select_one("#wrap") or soup.find("main") or soup
+        text = content.get_text(
             "\n",
             strip=True,
         )
