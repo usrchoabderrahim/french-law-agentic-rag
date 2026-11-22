@@ -1,0 +1,18 @@
+{"id": "f01", "question": "Dans quel délai faut-il justifier une absence à un examen ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["72 h", "absence"]}
+{"id": "f02", "question": "Combien de rattrapages un étudiant a-t-il le droit de passer par module ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["un seul rattrapage"]}
+{"id": "f03", "question": "Quelle note minimale faut-il avoir à chaque module pour valider une année de la LST ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["RG15", "inférieure à 6"]}
+{"id": "f04", "question": "Que risque un étudiant surpris en train de tricher à un examen ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["conseil de discipline", "fraude"]}
+{"id": "f05", "question": "Quelles sont les sanctions prévues en cas de fraude, de la plus légère à la plus lourde ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["Avertissement", "Blâme"]}
+{"id": "f06", "question": "Combien de temps après l'affichage des résultats peut-on demander à consulter sa copie ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["consultation", "24 h"]}
+{"id": "f07", "question": "Au bout de combien de minutes l'étudiant peut-il quitter la salle d'examen ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["30 min"]}
+{"id": "f08", "question": "Combien de crédits supplémentaires peuvent valoriser les activités para-universitaires ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["trois crédits"]}
+{"id": "f09", "question": "Quelle est la durée normale de préparation du doctorat ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["dure trois années"]}
+{"id": "f10", "question": "Combien de rapports favorables faut-il pour être autorisé à soutenir sa thèse ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["deux rapports"]}
+{"id": "f11", "question": "Comment faire pour créer un compte sur la plateforme E-Scolarité ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["fstbm.ac.ma/web/signup"]}
+{"id": "f12", "question": "Quels diplômes la FST de Béni Mellal délivre-t-elle après le Master ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["Diplôme d’Ingénieur d’Etat"]}
+{"id": "f13", "question": "Que se passe-t-il en cas de litige entre le doctorant et son directeur de thèse ?", "corpus": "fstbm", "role": "reader", "relevant_keywords": ["Règlement de litiges"]}
+{"id": "o01", "question": "Que prévoit l'article 59 sur le nantissement de parts sociales ?", "corpus": "ocr", "role": "reader", "relevant_keywords": ["nantissement", "cessionnaire"]}
+{"id": "o02", "question": "Quelles sont les règles pour le registre des déclarations de don d'organes tenu au tribunal ?", "corpus": "ocr", "role": "reader", "relevant_keywords": ["don d'organes", "registre"]}
+{"id": "o03", "question": "Quelle loi régit la société en nom collectif ?", "corpus": "ocr", "role": "reader", "relevant_keywords": ["société en nom collectif", "5-96"]}
+{"id": "o04", "question": "Qui est chargé de l'application de l'agrément accordé aux banques ?", "corpus": "ocr", "role": "reader", "relevant_keywords": ["Bank Al-Maghrib est chargée"]}
+{"id": "o05", "question": "Dans quelles conditions l'agrément peut-il être retiré pour les semences et plants ?", "corpus": "ocr", "role": "reader", "relevant_keywords": ["semences et des plants"]}
