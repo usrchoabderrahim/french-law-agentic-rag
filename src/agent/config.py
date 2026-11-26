@@ -43,7 +43,7 @@ MAX_GENERATION_ATTEMPTS = 2     # G : première génération + 1 régénération
 
 # --- budget global par requête ------------------------------------------------
 MAX_LLM_CALLS = 40
-MAX_LATENCY_SECONDS = 300.0
+MAX_LATENCY_SECONDS = 600.0     # les modèles gratuits répondent en 5 à 30 s par appel
 
 # --- messages utilisateur -----------------------------------------------------
 FALLBACK_MESSAGE = "Je n'ai pas trouvé d'information disponible pour votre profil dans le corpus."

@@ -120,11 +120,11 @@ class OpenRouterLLM:
                     self.model = model
                     return (data["choices"][0]["message"].get("content") or "").strip()
                 except urllib.error.HTTPError as exc:
-                    if exc.code not in (429, 502, 503):
+                    if exc.code in (401, 402, 403):          # clé invalide ou crédit : inutile d'insister
                         raise LLMUnavailable(f"OpenRouter HTTP {exc.code} ({model})") from exc
                     last_error = f"HTTP {exc.code} ({model})"
                 except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError) as exc:
-                    raise LLMUnavailable(f"OpenRouter injoignable ({model}): {exc}") from exc
+                    last_error = f"{type(exc).__name__} ({model})"  # réseau coupé, réponse vide…
             if attempt < self.max_retries:
                 time.sleep(5 * (attempt + 1))    # tous saturés : petite pause puis nouvel essai
         raise LLMUnavailable(f"OpenRouter : limite de débit persistante, dernier {last_error}")

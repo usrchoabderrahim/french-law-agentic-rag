@@ -20,8 +20,9 @@ SYSTEM = (
 INSTRUCTIONS = """
 1. Réécris la question en question autonome grâce à l'historique (standalone_question).
 2. Choisis route :
-   - "direct" : salutation, remerciement, question sur le système, ou réponse déjà
-     présente dans l'historique AVEC ses citations (recopie-la dans direct_answer) ;
+   - "direct" : salutation, remerciement, question sur le système (réponds alors avec
+     system_description, sans rien ajouter), ou réponse déjà présente dans l'historique
+     AVEC ses citations (recopie-la dans direct_answer) ;
    - "recherche" : toute nouvelle question juridique ou réglementaire ;
    - "refus" : hors périmètre.
 3. Si route = "recherche", décompose en 1 à 4 sous-questions si la demande en contient plusieurs.
@@ -62,7 +63,8 @@ def normalize(out: dict[str, Any], question: str) -> dict[str, Any]:
 def make_orchestrateur(llm: LLMClient):
     def orchestrateur(state: AgentState) -> dict:
         question = state["question"]
-        data = {"question": question, "history": state.get("history", [])[-6:]}
+        data = {"question": question, "history": state.get("history", [])[-6:],
+                "system_description": SYSTEM_DESCRIPTION}
         out = ask_json(state, llm, "orchestrateur", SYSTEM, INSTRUCTIONS, data,
                        retries=config.ORCHESTRATOR_JSON_RETRIES, validate=_valid)
         if out is None:
