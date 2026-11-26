@@ -25,3 +25,5 @@ temp/
 dist/
 build/
 out/
+# Données locales (embeddings, index, caches) : jamais versionnées
+data/
