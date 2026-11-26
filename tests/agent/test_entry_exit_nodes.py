@@ -193,6 +193,26 @@ def test_openrouter_requete_et_reponse(monkeypatch):
     assert sent["body"]["model"] == "m:free" and sent["body"]["messages"][0]["role"] == "system"
 
 
+def test_openrouter_modele_sature_passe_au_suivant(monkeypatch):
+    import io
+    import json as _json
+    import urllib.error
+    from src.agent import llm as llm_mod
+    tried = []
+
+    def fake_urlopen(request, timeout):
+        model = _json.loads(request.data)["model"]
+        tried.append(model)
+        if model == "a:free":
+            raise urllib.error.HTTPError(request.full_url, 429, "rate", {}, None)
+        return io.BytesIO(_json.dumps({"choices": [{"message": {"content": "{}"}}]}).encode())
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(llm_mod.urllib.request, "urlopen", fake_urlopen)
+    client = llm_mod.OpenRouterLLM(model="a:free, b:free")
+    assert client.generate("p") == "{}" and tried == ["a:free", "b:free"] and client.model == "b:free"
+
+
 def test_budget_depasse_part_en_repli(monkeypatch):
     monkeypatch.setattr(config, "MAX_LLM_CALLS", 0)
     out = AgenticRAG(llm=ScriptedLLM()).run("Quelle est la durée de la thèse ?", "reader")

@@ -80,13 +80,21 @@ class OllamaLLM:
 # Backend 2 : OpenRouter (API compatible OpenAI, modèles gratuits « :free »)
 # --------------------------------------------------------------------------- #
 class OpenRouterLLM:
-    """La clé est lue dans OPENROUTER_API_KEY (jamais écrite dans un fichier ni journalisée)."""
+    """La clé est lue dans OPENROUTER_API_KEY (jamais écrite dans un fichier ni journalisée).
+
+    OPENROUTER_MODEL accepte une liste séparée par des virgules : quand un modèle gratuit
+    est saturé (HTTP 429), on passe au suivant.
+    """
 
     URL = "https://openrouter.ai/api/v1/chat/completions"
+    DEFAULT_MODELS = ("nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3.5-super-vl:free,"
+                      "google/gemma-4-31b-it:free")
 
-    def __init__(self, model: str | None = None, timeout: int = 120, max_retries: int = 3):
+    def __init__(self, model: str | None = None, timeout: int = 120, max_retries: int = 2):
         self.api_key = os.getenv("OPENROUTER_API_KEY", "")
-        self.model = model or os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
+        names = model or os.getenv("OPENROUTER_MODEL") or self.DEFAULT_MODELS
+        self.models = [m.strip() for m in names.split(",") if m.strip()]
+        self.model = self.models[0]
         self.timeout = timeout
         self.max_retries = max_retries
 
@@ -98,23 +106,28 @@ class OpenRouterLLM:
             raise LLMUnavailable("OPENROUTER_API_KEY absente")
         messages = ([{"role": "system", "content": system}] if system else []) + [
             {"role": "user", "content": prompt}]
-        body = json.dumps({"model": self.model, "messages": messages, "temperature": 0.1}).encode()
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json",
                    "X-Title": "french-law-agentic-rag"}
+        last_error = ""
         for attempt in range(self.max_retries + 1):
-            request = urllib.request.Request(self.URL, data=body, headers=headers)
-            try:
-                with urllib.request.urlopen(request, timeout=self.timeout) as resp:
-                    data = json.loads(resp.read())
-                return (data["choices"][0]["message"].get("content") or "").strip()
-            except urllib.error.HTTPError as exc:
-                if exc.code in (429, 502, 503) and attempt < self.max_retries:  # limite gratuite
-                    time.sleep(float(exc.headers.get("Retry-After") or 5 * (attempt + 1)))
-                    continue
-                raise LLMUnavailable(f"OpenRouter HTTP {exc.code} ({self.model})") from exc
-            except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError) as exc:
-                raise LLMUnavailable(f"OpenRouter injoignable ({self.model}): {exc}") from exc
-        raise LLMUnavailable("OpenRouter : limite de débit persistante")
+            for model in self.models:            # modèle saturé → modèle suivant
+                body = json.dumps({"model": model, "messages": messages,
+                                   "temperature": 0.1}).encode()
+                request = urllib.request.Request(self.URL, data=body, headers=headers)
+                try:
+                    with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                        data = json.loads(resp.read())
+                    self.model = model
+                    return (data["choices"][0]["message"].get("content") or "").strip()
+                except urllib.error.HTTPError as exc:
+                    if exc.code not in (429, 502, 503):
+                        raise LLMUnavailable(f"OpenRouter HTTP {exc.code} ({model})") from exc
+                    last_error = f"HTTP {exc.code} ({model})"
+                except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError) as exc:
+                    raise LLMUnavailable(f"OpenRouter injoignable ({model}): {exc}") from exc
+            if attempt < self.max_retries:
+                time.sleep(5 * (attempt + 1))    # tous saturés : petite pause puis nouvel essai
+        raise LLMUnavailable(f"OpenRouter : limite de débit persistante, dernier {last_error}")
 
 
 # --------------------------------------------------------------------------- #

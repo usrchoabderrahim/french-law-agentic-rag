@@ -83,7 +83,7 @@ Tous les backends sont gratuits :
 | `RAG_LLM` | Backend | Réglages |
 |---|---|---|
 | `ollama` | LLM local Ollama | `OLLAMA_MODEL` (défaut `qwen2.5:7b`), `OLLAMA_URL` |
-| `openrouter` | API OpenRouter, modèles `:free` | `OPENROUTER_API_KEY` (variable d'environnement, jamais committée), `OPENROUTER_MODEL` (défaut `google/gemma-4-31b-it:free`) |
+| `openrouter` | API OpenRouter, modèles `:free` | `OPENROUTER_API_KEY` (variable d'environnement, jamais committée), `OPENROUTER_MODEL` (liste séparée par des virgules ; si un modèle gratuit est saturé, le suivant est essayé) |
 | `heuristic` | moteur hors-ligne déterministe | — |
 | `auto` (défaut) | Ollama s'il répond, sinon OpenRouter si la clé existe, sinon heuristic | — |
 
