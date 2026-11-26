@@ -122,6 +122,9 @@ class OpenRouterLLM:
                 except urllib.error.HTTPError as exc:
                     if exc.code in (401, 402, 403):          # clé invalide ou crédit : inutile d'insister
                         raise LLMUnavailable(f"OpenRouter HTTP {exc.code} ({model})") from exc
+                    detail = exc.read().decode("utf-8", "replace") if exc.fp else ""
+                    if "per-day" in detail:                  # quota gratuit du jour épuisé : tous les modèles
+                        raise LLMUnavailable("OpenRouter : quota gratuit du jour épuisé") from exc
                     last_error = f"HTTP {exc.code} ({model})"
                 except (urllib.error.URLError, OSError, ValueError, KeyError, IndexError) as exc:
                     last_error = f"{type(exc).__name__} ({model})"  # réseau coupé, réponse vide…

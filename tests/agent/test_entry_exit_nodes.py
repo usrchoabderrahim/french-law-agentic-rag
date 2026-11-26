@@ -213,6 +213,24 @@ def test_openrouter_modele_sature_passe_au_suivant(monkeypatch):
     assert client.generate("p") == "{}" and tried == ["a:free", "b:free"] and client.model == "b:free"
 
 
+def test_openrouter_quota_journalier_arrete_tout_de_suite(monkeypatch):
+    import io
+    import urllib.error
+    from src.agent import llm as llm_mod
+    tried = []
+
+    def fake_urlopen(request, timeout):
+        tried.append(1)
+        body = io.BytesIO(b'{"error":{"message":"Rate limit exceeded: free-models-per-day"}}')
+        raise urllib.error.HTTPError(request.full_url, 429, "rate", {}, body)
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(llm_mod.urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(llm_mod.LLMUnavailable, match="quota gratuit du jour"):
+        llm_mod.OpenRouterLLM(model="a:free,b:free").generate("p")
+    assert len(tried) == 1                                         # aucun nouvel essai inutile
+
+
 def test_budget_depasse_part_en_repli(monkeypatch):
     monkeypatch.setattr(config, "MAX_LLM_CALLS", 0)
     out = AgenticRAG(llm=ScriptedLLM()).run("Quelle est la durée de la thèse ?", "reader")
